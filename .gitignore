@@ -1,40 +1,32 @@
+# Environment files
+.env
+*.env
+
 # Python
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
 .Python
 *.egg-info/
 dist/
 build/
+.venv/
 venv/
 env/
-.venv/
 
-# Environment
-.env
-*.env.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# Database
+*.db
+*.sqlite
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Streamlit
-.streamlit/secrets.toml
+# IDE
+.vscode/
+.idea/
+*.swp
 
-# Docker
+# Logs
 *.log
-
-# Database
-*.db
-*.sqlite3
-
-# Uploads (temp files)
-uploads/
-temp/
