@@ -1,49 +1,56 @@
 """
 LLM Agents — ALL AI/LLM logic lives here.
 
-The Groq client is instantiated ONCE using settings (which already called load_dotenv).
-Every interview round and evaluation function is defined in this module.
-
-Model structure:
-  - groq_client  →  single Groq SDK instance (api_key from settings.GROQ_API_KEY)
-  - get_system_prompt()  →  returns round-specific system prompt
-  - generate_question()  →  asks the next interview question
-  - evaluate_answer()    →  scores and gives feedback on a candidate answer
-  - generate_final_feedback()  →  produces the end-of-interview report
+Uses Groq SDK 0.13.x which is compatible with Python 3.12+.
+The Groq client is instantiated ONCE.
 """
 
 import json
 import re
+
 from groq import Groq
 
 from app.core.config import settings
 
 # ── Single Groq client instance ───────────────────────────────────────────────
-# api_key is read from settings, which loaded it via load_dotenv in config.py
 groq_client = Groq(api_key=settings.GROQ_API_KEY)
 
 
-# ── System Prompts ─────────────────────────────────────────────────────────────
+# ── System Prompts ────────────────────────────────────────────────────────────
 
 def get_system_prompt(round_name: str, resume_data: dict) -> str:
-    """Build a round-specific system prompt personalised with the candidate's resume."""
+    """Build a round-specific system prompt personalised with candidate's resume."""
+
+    def _join(items: list, limit: int = 10) -> str:
+        return ", ".join(str(i) for i in items[:limit]) if items else "Not specified"
+
+    skills = resume_data.get("technical_skills") or resume_data.get("skills") or []
+    projects = resume_data.get("projects") or []
+    experience = resume_data.get("experience") or []
+    education = resume_data.get("education") or []
+
+    project_names = _join([
+        p.get("name", "") if isinstance(p, dict) else str(p)
+        for p in projects
+    ], 3)
+
+    exp_summary = _join([
+        f"{e.get('role', '')} at {e.get('company', '')}" if isinstance(e, dict) else str(e)
+        for e in experience
+    ], 2)
+
+    edu_summary = _join([
+        e.get("degree", "") if isinstance(e, dict) else str(e)
+        for e in education
+    ], 2)
 
     resume_summary = f"""
 Candidate Profile:
 - Name: {resume_data.get('name', 'Candidate')}
-- Skills: {', '.join(resume_data.get('technical_skills', resume_data.get('skills', []))[:10])}
-- Projects: {', '.join([
-    p.get('name', '') if isinstance(p, dict) else str(p)
-    for p in resume_data.get('projects', [])[:3]
-])}
-- Experience: {', '.join([
-    (e.get('role', '') + ' at ' + e.get('company', '')) if isinstance(e, dict) else str(e)
-    for e in resume_data.get('experience', [])[:2]
-])}
-- Education: {', '.join([
-    e.get('degree', '') if isinstance(e, dict) else str(e)
-    for e in resume_data.get('education', [])[:2]
-])}
+- Skills: {_join(skills)}
+- Projects: {project_names}
+- Experience: {exp_summary}
+- Education: {edu_summary}
 """
 
     prompts = {
@@ -99,7 +106,7 @@ def generate_question(
     """Generate the next interview question using the Groq LLM."""
 
     system_prompt = get_system_prompt(round_name, resume_data)
-    messages = [{"role": "system", "content": system_prompt}]
+    messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
     if not chat_history:
         intro_map = {
@@ -143,6 +150,9 @@ def evaluate_answer(
             "sample_answer_hint": "Aim for a complete, structured response.",
         }
 
+    skills = resume_data.get("technical_skills") or resume_data.get("skills") or []
+    projects = resume_data.get("projects") or []
+
     prompt = f"""You are evaluating an interview answer. Return ONLY valid JSON.
 
 Round: {round_name}
@@ -150,8 +160,8 @@ Question: {question}
 Candidate's Answer: {answer}
 
 Candidate's background:
-- Skills: {', '.join(resume_data.get('technical_skills', resume_data.get('skills', []))[:8])}
-- Projects: {', '.join([p.get('name', '') if isinstance(p, dict) else str(p) for p in resume_data.get('projects', [])[:3]])}
+- Skills: {", ".join(str(s) for s in skills[:8])}
+- Projects: {", ".join(p.get("name", "") if isinstance(p, dict) else str(p) for p in projects[:3])}
 
 Evaluate and return this exact JSON (no markdown, no extra text):
 {{
@@ -207,7 +217,7 @@ def generate_final_feedback(
     prompt = f"""Generate a comprehensive interview performance report. Return ONLY valid JSON.
 
 Candidate: {resume_data.get('name', 'Candidate')}
-Skills: {', '.join(resume_data.get('technical_skills', resume_data.get('skills', []))[:8])}
+Skills: {", ".join(str(s) for s in (resume_data.get('technical_skills') or resume_data.get('skills') or [])[:8])}
 
 Round Scores:
 {scores_text}

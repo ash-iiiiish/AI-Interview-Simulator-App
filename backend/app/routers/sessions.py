@@ -11,7 +11,9 @@ router = APIRouter()
 
 @router.get("/{session_token}")
 async def get_session(session_token: str, db: Session = Depends(get_db)):
-    session = db.query(InterviewSession).filter(InterviewSession.session_token == session_token).first()
+    session = db.query(InterviewSession).filter(
+        InterviewSession.session_token == session_token
+    ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
 
@@ -29,7 +31,9 @@ async def get_session(session_token: str, db: Session = Depends(get_db)):
 
 @router.delete("/{session_token}")
 async def delete_session(session_token: str, db: Session = Depends(get_db)):
-    session = db.query(InterviewSession).filter(InterviewSession.session_token == session_token).first()
+    session = db.query(InterviewSession).filter(
+        InterviewSession.session_token == session_token
+    ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
 

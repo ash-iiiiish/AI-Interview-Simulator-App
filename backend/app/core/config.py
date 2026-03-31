@@ -1,34 +1,33 @@
 """
-Central configuration — all environment variables are loaded here.
-Every other module imports from this file instead of calling os.getenv() directly.
+Central configuration — all environment variables loaded via pydantic-settings.
+Pydantic v2 + pydantic-settings replaces the old os.getenv() pattern and is
+fully compatible with Python 3.12+.
 """
 
-import os
-from dotenv import load_dotenv
-
-# Load .env from the backend directory (or project root via Docker env_file)
-load_dotenv()
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings:
-    # ── Groq LLM ──────────────────────────────────────────────────────────────
-    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-
-    # Model used for all LLM agents
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-
-    # ── Database ───────────────────────────────────────────────────────────────
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://postgres:password@localhost:5432/ai_interview_db"
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
     )
 
+    # ── Groq LLM ──────────────────────────────────────────────────────────────
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+
+    # ── Database ───────────────────────────────────────────────────────────────
+    DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/ai_interview_db"
+
     # ── App ────────────────────────────────────────────────────────────────────
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me-in-production")
-    BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
+    SECRET_KEY: str = "change-me-in-production"
+    BACKEND_URL: str = "http://localhost:8000"
 
     # ── Interview Config ───────────────────────────────────────────────────────
-    ROUNDS: list = ["HR", "APTITUDE", "TECHNICAL", "DSA"]
+    ROUNDS: list[str] = ["HR", "APTITUDE", "TECHNICAL", "DSA"]
     QUESTIONS_PER_ROUND: int = 3
 
     ROUND_CONFIG: dict = {

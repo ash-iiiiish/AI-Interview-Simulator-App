@@ -1,149 +1,158 @@
-# ⬡ AI Interview Simulator
+# 🎯 AI Interview Simulator
 
-Multi-round AI-powered interview simulator with an avatar interviewer UI,
-resume parsing, real-time evaluation, and a final performance report.
+A full-stack AI-powered interview simulator with a cinematic UI.  
+Practice across **4 rounds** — HR, Aptitude, Technical & DSA — with real-time AI scoring powered by **Groq (Llama 3.3-70B)**.
 
 ---
 
-## Project Structure
+## ✨ Features
+
+| Feature | Details |
+|---|---|
+| 🤖 AI Interviewers | 4 distinct AI personas for each round |
+| 📄 Resume Parsing | PDF & DOCX support via pdfplumber + python-docx |
+| 🧠 Smart Questions | Personalized to your resume skills & projects |
+| 📊 Live Scoring | Per-answer scores with strengths & improvements |
+| 🗄️ PostgreSQL | Full session persistence across rounds |
+| 🎨 Cinematic UI | Sci-fi HUD, holographic avatar, animated EQ bars |
+
+---
+
+## 🗂 Project Structure
 
 ```
-ai-interview-simulator/
-├── .env.example              ← copy to .env and fill in your keys
-├── .gitignore
-├── docker-compose.yml
-│
+AI-Interview-Simulator/
 ├── backend/
-│   ├── main.py               ← FastAPI entry point (run: uvicorn app.main:app)
-│   ├── requirements.txt
-│   ├── Dockerfile
+│   ├── main.py                     ← FastAPI entry point
 │   └── app/
+│       ├── agents/llm_agents.py    ← All Groq LLM logic
 │       ├── core/
-│       │   ├── config.py     ← load_dotenv() lives here — single source of truth
-│       │   └── database.py   ← SQLAlchemy engine + session
-│       ├── models/
-│       │   └── models.py     ← All ORM models (InterviewSession, RoundResult, etc.)
-│       ├── schemas/
-│       │   └── schemas.py    ← Pydantic request/response schemas
-│       ├── agents/
-│       │   └── llm_agents.py ← Groq client + all LLM agent functions (question gen, eval, report)
-│       ├── services/
-│       │   └── resume_service.py ← PDF/DOCX parsing + resume scoring
-│       └── routers/
-│           ├── resume.py
-│           ├── interview.py
-│           ├── evaluation.py
-│           └── sessions.py
-│
-└── frontend/
-    ├── app.py                ← Streamlit UI (avatar interviewer, rich CSS)
-    ├── requirements.txt
-    ├── Dockerfile
-    └── .streamlit/
-        └── config.toml
+│       │   ├── config.py           ← pydantic-settings config
+│       │   └── database.py         ← SQLAlchemy 2.x engine
+│       ├── models/models.py        ← ORM tables
+│       ├── routers/                ← API endpoints
+│       │   ├── interview.py
+│       │   ├── resume.py
+│       │   ├── evaluation.py
+│       │   └── sessions.py
+│       ├── schemas/schemas.py      ← Pydantic v2 request/response
+│       └── services/resume_service.py
+├── frontend/
+│   ├── app.py                      ← Streamlit UI (cinematic)
+│   └── .streamlit/config.toml
+├── requirements.txt                ← Single clean file, Python 3.12+
+└── .env.example                    ← Copy to .env and fill in keys
 ```
 
 ---
 
-## Where is the LLM / Model Structure?
+## ⚙️ Setup
 
-All LLM logic is in **`backend/app/agents/llm_agents.py`**:
+### 1. Clone & Install
 
-- `groq_client` — single Groq SDK instance (reads `GROQ_API_KEY` from `settings`)
-- `get_system_prompt()` — builds round-specific persona prompt
-- `generate_question()` — generates the next interview question
-- `evaluate_answer()` — scores the candidate's answer with structured JSON
-- `generate_final_feedback()` — produces the end-of-interview report
+```bash
+git clone <your-repo>
+cd AI-Interview-Simulator
 
-The model (`llama-3.3-70b-versatile`) is configured in `app/core/config.py` via `GROQ_MODEL`.
+# Create virtual environment (recommended)
+python -m venv .venv
+source .venv/bin/activate    # Windows: .venv\Scripts\activate
 
----
-
-## How `load_dotenv` Works
-
-`load_dotenv()` is called **once**, in `backend/app/core/config.py`.
-Every other module imports `settings` from there — no module calls `os.getenv()` directly.
-
-```
-.env
- └─► app/core/config.py  (load_dotenv + Settings class)
-       ├─► app/core/database.py      (settings.DATABASE_URL)
-       ├─► app/agents/llm_agents.py  (settings.GROQ_API_KEY, settings.GROQ_MODEL)
-       └─► app/routers/*.py          (settings.ROUNDS, settings.ROUND_CONFIG)
+pip install -r requirements.txt
 ```
 
-Frontend reads `BACKEND_URL` via its own `load_dotenv()` call in `frontend/app.py`.
-
----
-
-## Setup
-
-### 1. Copy and fill `.env`
+### 2. Configure Environment
 
 ```bash
 cp .env.example .env
+# Then edit .env with your values:
+#   GROQ_API_KEY=gsk_...
+#   DATABASE_URL=postgresql://postgres:password@localhost:5432/ai_interview_db
 ```
 
-Edit `.env`:
-```
-GROQ_API_KEY=gsk_...          # from https://console.groq.com
-DATABASE_URL=postgresql://postgres:password@localhost:5432/ai_interview_db
-BACKEND_URL=http://localhost:8000
-SECRET_KEY=some-random-secret
+Get a free Groq API key at: https://console.groq.com
+
+### 3. Set Up PostgreSQL
+
+```bash
+# Ubuntu / Debian
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+
+# Create database
+sudo -u postgres psql -c "CREATE DATABASE ai_interview_db;"
+sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ai_interview_db TO postgres;"
 ```
 
-### 2. Run with Docker (recommended)
+> Tables are auto-created on first backend startup via SQLAlchemy.
+
+### 4. Run the Backend
+
+```bash
+cd backend
+uvicorn main:app --reload --port 8000
+```
+
+Verify: http://localhost:8000/docs
+
+### 5. Run the Frontend
+
+```bash
+cd frontend
+streamlit run app.py
+```
+
+Open: http://localhost:8501
+
+---
+
+## 🐘 PostgreSQL Schema
+
+Tables created automatically:
+
+| Table | Purpose |
+|---|---|
+| `interview_sessions` | Session token, resume data, current round |
+| `round_results` | Per-round scores and completion status |
+| `question_answers` | Every Q&A pair with individual scores |
+| `chat_messages` | Full conversation log per round |
+
+---
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/resume/upload` | Upload PDF/DOCX, parse, create session |
+| GET  | `/api/resume/score/{token}` | Get resume score |
+| POST | `/api/interview/start` | Start/resume a round, get first question |
+| POST | `/api/interview/answer` | Submit answer, get evaluation + next Q |
+| GET  | `/api/interview/history/{token}` | Get chat history |
+| GET  | `/api/evaluation/results/{token}` | Full performance report |
+| GET  | `/api/sessions/{token}` | Session status |
+| DELETE | `/api/sessions/{token}` | Delete session |
+
+---
+
+## 🐛 Bug Fixes Applied (vs Original)
+
+| File | Fix |
+|---|---|
+| `requirements.txt` | Removed duplicates; updated to latest Python 3.12-compatible versions; added `pydantic-settings` |
+| `core/config.py` | Replaced bare `os.getenv()` with `pydantic-settings BaseSettings` |
+| `core/database.py` | Fixed deprecated `declarative_base()` → `class Base(DeclarativeBase)` (SQLAlchemy 2.x) |
+| `schemas/schemas.py` | Updated to Python 3.12 native `list[str]` / `dict[str,Any]` typing |
+| `llm_agents.py` | Fixed `None` dict access errors with safe `or []` fallbacks |
+| `resume_service.py` | Same null-safety fixes; added `pool_pre_ping` to engine |
+| `frontend/app.py` | Complete UI overhaul with cinematic wallpaper, holographic avatar, animated HUD |
+
+---
+
+## 🚀 Docker (Optional)
 
 ```bash
 docker-compose up --build
 ```
 
-- Backend: http://localhost:8000
-- Frontend: http://localhost:8501
-- API Docs: http://localhost:8000/docs
-
-### 3. Run locally (without Docker)
-
-**Backend:**
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-**Frontend:**
-```bash
-cd frontend
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Make sure PostgreSQL is running and `DATABASE_URL` in `.env` points to it.
-
----
-
-## Interview Rounds
-
-| Round | Interviewer | Focus |
-|---|---|---|
-| **HR** | Sarah Chen | Behavioral, STAR method, cultural fit |
-| **Aptitude** | Prof. Arjun | Math, logic, reasoning |
-| **Technical** | Alex Rivera | Resume-based domain questions |
-| **DSA** | Bot-9000 | Algorithms, data structures |
-
-Each round has 3 questions. Answers are scored 1–10 with strengths and improvement tips.
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/resume/upload` | Upload PDF/DOCX, parse resume, create session |
-| GET | `/api/resume/score/{token}` | Get resume score |
-| POST | `/api/interview/start` | Start/resume a round |
-| POST | `/api/interview/answer` | Submit answer, get evaluation + next question |
-| GET | `/api/interview/history/{token}` | Chat history |
-| GET | `/api/evaluation/results/{token}` | Full results + final report |
-| GET | `/api/sessions/{token}` | Session details |
-| DELETE | `/api/sessions/{token}` | Delete session |
+This starts both backend (port 8000) and frontend (port 8501) with a PostgreSQL container.

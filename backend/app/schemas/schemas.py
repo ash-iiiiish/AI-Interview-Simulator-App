@@ -1,9 +1,9 @@
 """
-Pydantic schemas — request bodies and response shapes for all API endpoints.
+Pydantic v2 schemas — request bodies and response shapes for all API endpoints.
 """
 
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Any, Optional
+from pydantic import BaseModel, field_validator
 
 
 # ── Interview ──────────────────────────────────────────────────────────────────
@@ -25,12 +25,12 @@ class AnswerRequest(BaseModel):
 class EvaluationResult(BaseModel):
     score: float
     feedback: str
-    strengths: List[str]
-    improvements: List[str]
+    strengths: list[str]
+    improvements: list[str]
     sample_answer_hint: Optional[str] = None
 
 
 class RoundDetail(BaseModel):
     score: float
-    config: Dict[str, Any]
-    questions: List[Dict[str, Any]]
+    config: dict[str, Any]
+    questions: list[dict[str, Any]]

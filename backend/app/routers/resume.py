@@ -32,7 +32,6 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     if not file_bytes:
         raise HTTPException(status_code=400, detail="File is empty.")
 
-    # Extract text
     try:
         text = extract_text_from_pdf(file_bytes) if fname.endswith(".pdf") else extract_text_from_docx(file_bytes)
     except Exception as e:
@@ -41,7 +40,6 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     if not text or len(text.strip()) < 50:
         raise HTTPException(status_code=422, detail="Could not extract meaningful text from the resume.")
 
-    # Parse and score
     try:
         resume_data = parse_resume_with_llm(text)
     except Exception as e:
@@ -49,7 +47,6 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
 
     resume_data["resume_score"] = calculate_resume_score(resume_data)
 
-    # Create session
     token = secrets.token_hex(32)
     session = InterviewSession(session_token=token, resume_data=resume_data, current_round="HR", status="active")
     db.add(session)
@@ -67,8 +64,6 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
 
 @router.get("/score/{session_token}")
 async def get_resume_score(session_token: str, db: Session = Depends(get_db)):
-    """Return the resume score for an existing session."""
-
     session = db.query(InterviewSession).filter(InterviewSession.session_token == session_token).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")

@@ -3,52 +3,47 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ai_interview_db
+    restart: unless-stopped
     environment:
+      POSTGRES_DB: ai_interview_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: ai_interview_db
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: ai_interview_backend
-    env_file: .env
+    build: ./backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_interview_db
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
+      - SECRET_KEY=${SECRET_KEY:-change-me}
+      - BACKEND_URL=http://localhost:8000
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./backend:/app
-    restart: unless-stopped
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: ai_interview_frontend
-    env_file: .env
+    build: ./frontend
+    restart: unless-stopped
     ports:
       - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-    restart: unless-stopped
-    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
 
 volumes:
-  postgres_data:
+  pgdata:

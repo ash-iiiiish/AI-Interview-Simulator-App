@@ -27,7 +27,9 @@ async def get_rounds():
 async def start_interview(request: StartRoundRequest, db: Session = Depends(get_db)):
     """Start or resume a round — returns the first question."""
 
-    session = db.query(InterviewSession).filter(InterviewSession.session_token == request.session_token).first()
+    session = db.query(InterviewSession).filter(
+        InterviewSession.session_token == request.session_token
+    ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
     if session.status == "completed":
@@ -55,7 +57,7 @@ async def start_interview(request: StartRoundRequest, db: Session = Depends(get_
     chat_history = [{"role": m.role, "content": m.content} for m in messages]
 
     question_number = round_result.questions_asked + 1
-    question = generate_question(round_name, session.resume_data, chat_history, question_number)
+    question = generate_question(round_name, session.resume_data or {}, chat_history, question_number)
 
     db.add(ChatMessage(session_id=session.id, role="assistant", content=question, round_name=round_name))
     round_result.questions_asked = question_number
@@ -74,7 +76,9 @@ async def start_interview(request: StartRoundRequest, db: Session = Depends(get_
 async def submit_answer(request: AnswerRequest, db: Session = Depends(get_db)):
     """Submit a candidate answer — evaluates it and returns next question or round transition."""
 
-    session = db.query(InterviewSession).filter(InterviewSession.session_token == request.session_token).first()
+    session = db.query(InterviewSession).filter(
+        InterviewSession.session_token == request.session_token
+    ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
 
@@ -82,7 +86,7 @@ async def submit_answer(request: AnswerRequest, db: Session = Depends(get_db)):
 
     db.add(ChatMessage(session_id=session.id, role="user", content=request.answer, round_name=round_name))
 
-    evaluation = evaluate_answer(round_name, request.question, request.answer, session.resume_data)
+    evaluation = evaluate_answer(round_name, request.question, request.answer, session.resume_data or {})
 
     round_result = db.query(RoundResult).filter(
         RoundResult.session_id == session.id,
@@ -103,7 +107,9 @@ async def submit_answer(request: AnswerRequest, db: Session = Depends(get_db)):
         feedback=evaluation.get("feedback", ""),
     ))
 
-    answered_count = db.query(QuestionAnswer).filter(QuestionAnswer.round_result_id == round_result.id).count() + 1
+    answered_count = db.query(QuestionAnswer).filter(
+        QuestionAnswer.round_result_id == round_result.id
+    ).count() + 1
     is_round_complete = answered_count >= QUESTIONS_PER_ROUND
 
     next_question = None
@@ -113,7 +119,7 @@ async def submit_answer(request: AnswerRequest, db: Session = Depends(get_db)):
     if is_round_complete:
         all_qas = db.query(QuestionAnswer).filter(QuestionAnswer.round_result_id == round_result.id).all()
         scores = [q.score for q in all_qas if q.score is not None] + [evaluation.get("score", 5)]
-        round_result.score = sum(scores) / len(scores) if scores else 5
+        round_result.score = sum(scores) / len(scores) if scores else 5.0
         round_result.completed = 1
 
         current_idx = ROUNDS.index(round_name) if round_name in ROUNDS else -1
@@ -134,7 +140,7 @@ async def submit_answer(request: AnswerRequest, db: Session = Depends(get_db)):
         chat_history.append({"role": "user", "content": request.answer})
 
         question_number = round_result.questions_asked + 1
-        next_question = generate_question(round_name, session.resume_data, chat_history, question_number)
+        next_question = generate_question(round_name, session.resume_data or {}, chat_history, question_number)
 
         db.add(ChatMessage(session_id=session.id, role="assistant", content=next_question, round_name=round_name))
         round_result.questions_asked = question_number
@@ -153,8 +159,12 @@ async def submit_answer(request: AnswerRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/history/{session_token}")
-async def get_chat_history(session_token: str, round_name: Optional[str] = None, db: Session = Depends(get_db)):
-    session = db.query(InterviewSession).filter(InterviewSession.session_token == session_token).first()
+async def get_chat_history(
+    session_token: str, round_name: Optional[str] = None, db: Session = Depends(get_db)
+):
+    session = db.query(InterviewSession).filter(
+        InterviewSession.session_token == session_token
+    ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
 

@@ -9,7 +9,6 @@ from app.models.models import InterviewSession, QuestionAnswer, RoundResult
 from app.agents.llm_agents import generate_final_feedback
 
 router = APIRouter()
-
 ROUND_CONFIG = settings.ROUND_CONFIG
 
 
@@ -17,19 +16,21 @@ ROUND_CONFIG = settings.ROUND_CONFIG
 async def get_evaluation_results(session_token: str, db: Session = Depends(get_db)):
     """Return full evaluation results for a completed interview."""
 
-    session = db.query(InterviewSession).filter(InterviewSession.session_token == session_token).first()
+    session = db.query(InterviewSession).filter(
+        InterviewSession.session_token == session_token
+    ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
 
     round_results = db.query(RoundResult).filter(RoundResult.session_id == session.id).all()
 
-    round_scores = {}
-    round_details = {}
+    round_scores: dict = {}
+    round_details: dict = {}
 
     for rr in round_results:
         qas = db.query(QuestionAnswer).filter(QuestionAnswer.round_result_id == rr.id).all()
         scores = [qa.score for qa in qas if qa.score is not None]
-        avg = sum(scores) / len(scores) if scores else 0
+        avg = sum(scores) / len(scores) if scores else 0.0
 
         round_scores[rr.round_name] = avg
         round_details[rr.round_name] = {
@@ -49,7 +50,7 @@ async def get_evaluation_results(session_token: str, db: Session = Depends(get_d
             all_answers=[],
         )
 
-    overall = sum(round_scores.values()) / len(round_scores) if round_scores else 0
+    overall = sum(round_scores.values()) / len(round_scores) if round_scores else 0.0
 
     return {
         "session_token": session_token,
@@ -66,7 +67,9 @@ async def get_evaluation_results(session_token: str, db: Session = Depends(get_d
 async def predict_score(session_token: str, db: Session = Depends(get_db)):
     """Predict final score based on rounds completed so far."""
 
-    session = db.query(InterviewSession).filter(InterviewSession.session_token == session_token).first()
+    session = db.query(InterviewSession).filter(
+        InterviewSession.session_token == session_token
+    ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
 

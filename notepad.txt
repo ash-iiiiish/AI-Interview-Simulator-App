@@ -1,0 +1,8 @@
+cp .env.example .env       # fill GROQ_API_KEY
+pip install -r requirements.txt
+
+# Terminal 1:
+cd backend && uvicorn main:app --reload --port 8000
+
+# Terminal 2:
+cd frontend && streamlit run app.py

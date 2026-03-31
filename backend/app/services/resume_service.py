@@ -1,7 +1,5 @@
 """
 Resume Service — PDF/DOCX text extraction, LLM-based parsing, and resume scoring.
-
-Uses groq_client from llm_agents (no separate client instantiation needed).
 """
 
 import io
@@ -117,7 +115,7 @@ def calculate_resume_score(resume_data: dict) -> dict:
     feedback = []
 
     # Skills — 20 pts
-    total_skills = len(resume_data.get("skills", [])) + len(resume_data.get("technical_skills", []))
+    total_skills = len(resume_data.get("skills") or []) + len(resume_data.get("technical_skills") or [])
     skill_score = min(20, total_skills * 2)
     score += skill_score
     if total_skills < 5:
@@ -126,7 +124,7 @@ def calculate_resume_score(resume_data: dict) -> dict:
         feedback.append(f"Good skill coverage with {total_skills} skills listed.")
 
     # Projects — 25 pts
-    projects = resume_data.get("projects", [])
+    projects = resume_data.get("projects") or []
     project_score = min(25, len(projects) * 8)
     score += project_score
     if len(projects) == 0:
@@ -137,7 +135,7 @@ def calculate_resume_score(resume_data: dict) -> dict:
         feedback.append(f"Great! {len(projects)} projects show practical experience.")
 
     # Experience — 25 pts
-    experience = resume_data.get("experience", [])
+    experience = resume_data.get("experience") or []
     exp_score = min(25, len(experience) * 10)
     score += exp_score
     if len(experience) == 0:
@@ -146,7 +144,7 @@ def calculate_resume_score(resume_data: dict) -> dict:
         feedback.append(f"{len(experience)} work experience entries look good.")
 
     # Education — 15 pts
-    education = resume_data.get("education", [])
+    education = resume_data.get("education") or []
     edu_score = 15 if len(education) > 0 else 0
     score += edu_score
     if len(education) == 0:
@@ -157,7 +155,7 @@ def calculate_resume_score(resume_data: dict) -> dict:
     score += contact_score
 
     # Certifications — 5 pts
-    certs = resume_data.get("certifications", [])
+    certs = resume_data.get("certifications") or []
     cert_score = min(5, len(certs) * 2)
     score += cert_score
     if certs:
