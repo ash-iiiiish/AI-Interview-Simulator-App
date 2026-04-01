@@ -655,4 +655,4 @@ elif st.session_state.page == "results":
     results_page()
 
 asdkasd
-ajjaffinalized UI : left changes size increasing & resolution maintenance
+ajjaffinalized UI : left changes size increasing & resolution maintenancefinalized UI : left changes size increasing & resolution maintenance
