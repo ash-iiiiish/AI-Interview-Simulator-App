@@ -1,9 +1,6 @@
 import os
-import time
+import random
 import requests
-import json
-import plotly.graph_objects as go
-import plotly.express as px
 from dotenv import load_dotenv
 import streamlit as st
 
@@ -19,526 +16,201 @@ st.set_page_config(
 
 ROUNDS = ["HR", "APTITUDE", "TECHNICAL", "DSA"]
 ROUND_META = {
-    "HR": {"label": "HR Round", "icon": "👤", "color": "#3b82f6", "accent": "#2563eb"},
-    "APTITUDE": {"label": "Aptitude Round", "icon": "🧮", "color": "#f59e0b", "accent": "#d97706"},
-    "TECHNICAL": {"label": "Technical Round", "icon": "💻", "color": "#10b981", "accent": "#059669"},
-    "DSA": {"label": "DSA Round", "icon": "🔢", "color": "#ef4444", "accent": "#dc2626"},
+  "HR":        {"label": "HR Round",       "icon": "👤", "color": "#2563eb", "bg": "#eff6ff", "border": "#bfdbfe"},
+  "APTITUDE":  {"label": "Aptitude Round",  "icon": "🧮", "color": "#d97706", "bg": "#fffbeb", "border": "#fde68a"},
+  "TECHNICAL": {"label": "Technical Round", "icon": "💻", "color": "#059669", "bg": "#ecfdf5", "border": "#a7f3d0"},
+  "DSA":       {"label": "DSA Round",       "icon": "🔢", "color": "#7c3aed", "bg": "#f5f3ff", "border": "#ddd6fe"},
 }
-
 INTERVIEWER_DATA = {
-    "HR": {"emoji": "👩‍💼", "name": "Sarah Chen", "title": "HR Business Partner", "company": "TechCorp Inc."},
-    "APTITUDE": {"emoji": "🧑‍🏫", "name": "Prof. Arjun", "title": "Assessment Specialist", "company": "EvalPro Solutions"},
-    "TECHNICAL": {"emoji": "👨‍💻", "name": "Alex Rivera", "title": "Principal Engineer", "company": "Silicon Labs"},
-    "DSA": {"emoji": "🤖", "name": "ARIA-9", "title": "Algorithm Intelligence", "company": "DeepCode AI"},
+  "HR":        {"emoji": "👩‍💼", "name": "Sarah Chen",  "title": "HR Business Partner",   "company": "TechCorp Inc."},
+  "APTITUDE":  {"emoji": "🧑‍🏫", "name": "Prof. Arjun", "title": "Assessment Specialist",  "company": "EvalPro Solutions"},
+  "TECHNICAL": {"emoji": "👨‍💻", "name": "Alex Rivera",  "title": "Principal Engineer",     "company": "Silicon Labs"},
+  "DSA":       {"emoji": "🤖",   "name": "ARIA-9",       "title": "Algorithm Intelligence", "company": "DeepCode AI"},
 }
+INTERVIEWER_GREETINGS = {
+  "HR":        "Hi! I'm Sarah. Let's explore your background, motivations, and cultural fit. I want to hear your story — be yourself!",
+  "APTITUDE":  "Hello! I'm Prof. Arjun. We'll work through logical and quantitative problems today. Take your time and think out loud.",
+  "TECHNICAL": "Hey! Alex here. I'll probe your technical depth through practical scenarios. Think of it as a collaborative discussion.",
+  "DSA":       "Initializing... ARIA-9 online. Algorithmic assessment mode: ACTIVE. Let us explore your problem-solving capabilities.",
+}
+FUN_FACTS = [
+  "Candidates who do mock interviews are 3× more likely to receive an offer.",
+  "The average tech interview has 5–7 rounds — preparation is everything.",
+  "Structured STAR-method answers score 40% higher on average.",
+  "Top candidates spend 10+ hours preparing before a major interview.",
+  "85% of jobs are filled through networking, but interviews seal the deal.",
+  "Interviewers form first impressions within the first 5 minutes.",
+  "Speaking at a measured pace boosts perceived confidence by 32%.",
+]
 
+# ── CSS ────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,[class*="css"]{font-family:'DM Sans',sans-serif!important;color:#111827!important}
+#MainMenu,footer,header{visibility:hidden}
+.stApp{background:#f8f7f4!important}
+.block-container{padding:0!important;max-width:100%!important;margin:0!important}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#f1f1f1}
+::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px}
 
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif !important;
-}
+/* NAVBAR */
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 3rem;background:#ffffff;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:100}
+.nav-logo{font-family:'DM Sans',sans-serif;font-size:1.25rem;font-weight:700;color:#111827;letter-spacing:-0.03em;display:flex;align-items:center;gap:0.5rem}
+.nav-logo .dot{width:8px;height:8px;background:#2563eb;border-radius:50%;display:inline-block}
+.nav-right{display:flex;align-items:center;gap:0.6rem}
+.npill{padding:0.3rem 0.85rem;border-radius:6px;font-size:0.72rem;font-family:'DM Mono',monospace;letter-spacing:0.01em;font-weight:500}
+.npill-dim{background:#f3f4f6;color:#9ca3af;border:1px solid #e5e7eb}
+.npill-blue{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
 
-#MainMenu, footer, header {
-    visibility: hidden;
-}
+/* PAGE WRAPPER */
+.page{padding:2.5rem 3rem 5rem;max-width:1400px;margin:0 auto}
+.iv-page{padding:2rem 3rem 5rem;max-width:1400px;margin:0 auto}
+.results-page{padding:2rem 3rem 5rem;max-width:1200px;margin:0 auto}
 
-.stApp {
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-}
+/* HERO */
+.hero{background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:4rem;margin-bottom:2rem;position:relative;overflow:hidden}
+.hero-label{display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 1rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:0.72rem;font-weight:600;color:#2563eb;margin-bottom:1.6rem;letter-spacing:0.06em;text-transform:uppercase}
+.hero-title{font-family:'Instrument Serif',serif;font-size:4rem;font-weight:400;line-height:1.1;color:#111827;letter-spacing:-0.02em;margin-bottom:1.2rem}
+.hero-title em{font-style:italic;color:#2563eb}
+.hero-sub{font-size:1.05rem;color:#6b7280;line-height:1.7;max-width:540px;margin-bottom:2.5rem;font-weight:400}
+.hero-stats{display:flex;gap:3rem}
+.hstat-num{font-family:'Instrument Serif',serif;font-size:2.4rem;color:#111827;line-height:1}
+.hstat-lbl{font-size:0.78rem;color:#9ca3af;margin-top:0.3rem;font-weight:500}
+.hero-deco{position:absolute;right:3rem;top:50%;transform:translateY(-50%);width:280px;height:280px;border-radius:50%;background:linear-gradient(135deg,#eff6ff,#f5f3ff);border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;font-size:5rem}
 
-.block-container {
-    padding: 1rem 2rem 3rem !important;
-    max-width: 1400px;
-    margin: 0 auto;
-}
+/* SECTION TITLES */
+.sec-title{font-family:'Instrument Serif',serif;font-size:1.7rem;font-weight:400;color:#111827;margin-bottom:0.3rem;letter-spacing:-0.01em}
+.sec-sub{font-size:0.88rem;color:#9ca3af;margin-bottom:1.5rem;font-weight:400}
 
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-::-webkit-scrollbar-track {
-    background: #e2e8f0;
-    border-radius: 10px;
-}
-::-webkit-scrollbar-thumb {
-    background: #94a3b8;
-    border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: #64748b;
-}
+/* ROUND CARDS */
+.round-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
+.round-card{background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:1.8rem 1.5rem;transition:all 0.2s ease;cursor:default}
+.round-card:hover{border-color:#d1d5db;transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,0,0,0.07)}
+.rc-icon-wrap{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin-bottom:1rem}
+.rc-name{font-family:'DM Sans',sans-serif;font-size:0.95rem;font-weight:600;color:#111827;margin-bottom:0.35rem}
+.rc-desc{font-size:0.8rem;color:#9ca3af;line-height:1.5}
+.rc-tag{display:inline-block;margin-top:0.9rem;padding:0.2rem 0.65rem;border-radius:5px;font-size:0.68rem;font-family:'DM Mono',monospace;font-weight:500}
 
-.navbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1.8rem;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 24px;
-    margin-bottom: 2rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-.nav-logo {
-    font-size: 1.5rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #2563eb, #4f46e5);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: -0.02em;
-}
-.nav-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 1rem;
-    background: #f1f5f9;
-    border-radius: 100px;
-    font-size: 0.75rem;
-    color: #475569;
-}
-.nav-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    font-size: 0.8rem;
-    color: #64748b;
-}
+/* GREETER */
+.greeter{background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:1.8rem 2rem;display:flex;align-items:center;gap:1.5rem;margin-bottom:1.5rem}
+.greeter-emo-wrap{width:60px;height:60px;border-radius:14px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0}
+.gname{font-size:1rem;font-weight:600;color:#111827;margin-bottom:0.1rem}
+.gtitle{font-size:0.75rem;color:#9ca3af;margin-bottom:0.5rem}
+.gmsg{font-size:0.88rem;color:#6b7280;line-height:1.55;font-style:italic}
 
-.progress-track {
-    display: flex;
-    align-items: center;
-    background: white;
-    border-radius: 60px;
-    padding: 0.5rem 1rem;
-    margin-bottom: 2rem;
-    border: 1px solid #e2e8f0;
-}
-.prog-step {
-    display: flex;
-    align-items: center;
-    flex: 1;
-}
-.prog-node {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.4rem;
-    flex-shrink: 0;
-}
-.prog-circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    background: #f1f5f9;
-    border: 2px solid #e2e8f0;
-    color: #64748b;
-    transition: all 0.3s ease;
-}
-.prog-circle.done {
-    background: #22c55e;
-    border-color: #22c55e;
-    color: white;
-}
-.prog-circle.active {
-    background: #3b82f6;
-    border-color: #3b82f6;
-    color: white;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-}
-.prog-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #64748b;
-    white-space: nowrap;
-}
-.prog-label.active {
-    color: #3b82f6;
-}
-.prog-label.done {
-    color: #22c55e;
-}
-.prog-line {
-    flex: 1;
-    height: 2px;
-    background: #e2e8f0;
-    margin: 0 0.5rem;
-    margin-bottom: 1.2rem;
-    border-radius: 2px;
-}
-.prog-line.done {
-    background: #22c55e;
-}
+/* FUN FACT */
+.funfact{background:#eff6ff;border:1px solid #bfdbfe;border-radius:16px;padding:1.4rem 2rem;display:flex;align-items:center;gap:1.2rem;margin-bottom:1.5rem}
+.ff-icon{font-size:1.5rem;flex-shrink:0}
+.ff-label{font-size:0.68rem;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem}
+.ff-text{font-size:0.9rem;color:#1e40af;line-height:1.5}
 
-.interviewer-panel {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 24px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
+/* UPLOAD CARD */
+.upload-card{background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:2rem 2rem 1.5rem;margin-bottom:1.5rem}
+.uc-title{font-family:'Instrument Serif',serif;font-size:1.4rem;font-weight:400;color:#111827;margin-bottom:0.3rem}
+.uc-sub{font-size:0.85rem;color:#9ca3af;margin-bottom:0}
 
-.panel-header {
-    padding: 1rem 1.5rem;
-    background: #fafbfc;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.panel-rec {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #ef4444;
-}
-.rec-dot {
-    width: 8px;
-    height: 8px;
-    background: #ef4444;
-    border-radius: 50%;
-    animation: pulse 1.5s ease-in-out infinite;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(1.2); }
-}
-.panel-id {
-    font-size: 0.7rem;
-    font-family: monospace;
-    color: #94a3b8;
-}
+[data-testid="stFileUploaderDropzone"]{background:#f8f7f4!important;border:2px dashed #d1d5db!important;border-radius:12px!important}
+[data-testid="stFileUploaderDropzoneInstructions"] p{color:#9ca3af!important}
+[data-testid="stFileUploaderDropzone"] svg{stroke:#d1d5db!important}
+[data-testid="stFileUploaderDropzone"]:hover{border-color:#2563eb!important;background:#eff6ff!important}
 
-.avatar-stage {
-    padding: 2rem 1.5rem 1rem;
-    text-align: center;
-}
-.avatar-emoji-wrap {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto;
-    background: linear-gradient(135deg, #f1f5f9, #ffffff);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3.5rem;
-    border: 3px solid #e2e8f0;
-    transition: all 0.3s ease;
-}
-.avatar-emoji-wrap.speaking {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-}
-.interviewer-name {
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-top: 1rem;
-    color: #0f172a;
-}
-.interviewer-title {
-    font-size: 0.75rem;
-    color: #64748b;
-    margin-top: 0.25rem;
-}
-.interviewer-company {
-    font-size: 0.7rem;
-    color: #3b82f6;
-    margin-top: 0.5rem;
-}
+/* BUTTONS */
+.stButton>button{background:#111827!important;color:#ffffff!important;border:none!important;border-radius:10px!important;padding:0.8rem 1.5rem!important;font-weight:600!important;font-size:0.95rem!important;font-family:'DM Sans',sans-serif!important;letter-spacing:-0.01em!important;transition:all 0.2s ease!important;width:100%!important}
+.stButton>button:hover{background:#1f2937!important;transform:translateY(-1px)!important;box-shadow:0 6px 20px rgba(17,24,39,0.15)!important}
+.stButton>button:active{transform:translateY(0)!important}
+.btn-primary .stButton>button{background:#2563eb!important}
+.btn-primary .stButton>button:hover{background:#1d4ed8!important;box-shadow:0 6px 20px rgba(37,99,235,0.25)!important}
+.btn-danger .stButton>button{background:#ffffff!important;color:#dc2626!important;border:1px solid #fca5a5!important}
+.btn-danger .stButton>button:hover{background:#fef2f2!important;border-color:#f87171!important;box-shadow:none!important;transform:none!important}
 
-.hud-chips {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: center;
-    margin: 1rem 0;
-}
-.hud-chip {
-    padding: 0.25rem 0.75rem;
-    background: #f1f5f9;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-family: monospace;
-    color: #475569;
-}
+/* PROGRESS BAR */
+.prog-wrap{background:#ffffff;border:1px solid #e5e7eb;border-radius:60px;padding:1rem 2.5rem;margin:0 3rem 2rem;display:flex;align-items:center}
+.prog-step{display:flex;align-items:center;flex:1}
+.prog-node{display:flex;flex-direction:column;align-items:center;gap:0.4rem;flex-shrink:0}
+.prog-circle{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.9rem;background:#f3f4f6;border:2px solid #e5e7eb;color:#9ca3af;transition:all 0.3s}
+.prog-circle.done{background:#059669;border-color:#059669;color:white}
+.prog-circle.active{background:#2563eb;border-color:#2563eb;color:white;box-shadow:0 0 0 4px #bfdbfe}
+.prog-label{font-size:0.68rem;font-weight:600;color:#d1d5db;white-space:nowrap}
+.prog-label.active{color:#2563eb}
+.prog-label.done{color:#059669}
+.prog-line{flex:1;height:2px;background:#e5e7eb;margin:0 0.5rem 1.2rem;border-radius:2px}
+.prog-line.done{background:#059669}
 
-.round-tag {
-    text-align: center;
-    margin: 1rem 0;
-}
-.round-tag-inner {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 1rem;
-    background: #f1f5f9;
-    border-radius: 100px;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
+/* INTERVIEW PANEL */
+.iv-panel{background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;overflow:hidden}
+.iv-topbar{background:#f8f7f4;border-bottom:1px solid #e5e7eb;padding:0.85rem 1.5rem;display:flex;justify-content:space-between;align-items:center}
+.iv-live{display:flex;align-items:center;gap:0.5rem;font-size:0.68rem;font-weight:700;color:#dc2626;letter-spacing:0.1em}
+.recdot{width:7px;height:7px;background:#dc2626;border-radius:50%;animation:blink-dot 1.4s ease-in-out infinite}
+@keyframes blink-dot{0%,100%{opacity:1}50%{opacity:0.2}}
+.iv-badge{font-size:0.68rem;font-family:'DM Mono',monospace;color:#9ca3af;background:#f3f4f6;padding:0.2rem 0.75rem;border-radius:6px;border:1px solid #e5e7eb}
+.iv-body{padding:2rem 1.5rem 1.5rem;text-align:center}
+.iv-emo{width:100px;height:100px;border-radius:20px;background:#f3f4f6;border:1.5px solid #e5e7eb;display:flex;align-items:center;justify-content:center;font-size:3rem;margin:0 auto 1rem;transition:all 0.3s}
+.iv-emo.speaking{border-color:#2563eb;box-shadow:0 0 0 4px #bfdbfe;background:#eff6ff}
+.iv-name{font-family:'DM Sans',sans-serif;font-size:1.05rem;font-weight:700;color:#111827}
+.iv-role{font-size:0.72rem;color:#9ca3af;margin-top:0.2rem}
+.iv-co{font-size:0.72rem;color:#2563eb;margin-top:0.35rem;font-weight:500}
+.iv-chips{display:flex;gap:0.5rem;justify-content:center;margin:1rem 0 1.2rem}
+.ivchip{padding:0.25rem 0.8rem;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;font-size:0.7rem;font-family:'DM Mono',monospace;color:#6b7280}
 
-.question-bubble {
-    margin: 0 1.5rem 1rem;
-    padding: 1.2rem;
-    background: #f8fafc;
-    border-left: 4px solid #3b82f6;
-    border-radius: 12px;
-    font-family: monospace;
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: #0f172a;
-}
-.typing-cursor {
-    display: inline-block;
-    width: 2px;
-    height: 1em;
-    background: #3b82f6;
-    margin-left: 2px;
-    animation: blink 1s step-end infinite;
-}
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
+/* QUESTION PANEL */
+.q-panel{background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;overflow:hidden}
+.q-topbar{background:#f8f7f4;border-bottom:1px solid #e5e7eb;padding:0.85rem 1.5rem;display:flex;justify-content:space-between;align-items:center}
+.q-head{font-size:0.68rem;color:#9ca3af;font-family:'DM Mono',monospace;font-weight:500}
+.q-cpill{font-size:0.68rem;font-family:'DM Mono',monospace;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;padding:0.2rem 0.75rem;border-radius:6px}
+.q-bubble{margin:1.6rem;padding:1.5rem;background:#f8f7f4;border-left:3px solid #2563eb;border-radius:10px;font-size:0.92rem;line-height:1.7;color:#1f2937;font-family:'DM Sans',sans-serif}
+.cursor{display:inline-block;width:2px;height:1em;background:#2563eb;margin-left:3px;animation:blink 1s step-end infinite;vertical-align:text-bottom}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.qdots{display:flex;gap:0.5rem;padding:0 1.6rem 1.6rem}
+.qdot{flex:1;height:3px;background:#e5e7eb;border-radius:4px}
+.qdot.done{background:#059669}
+.qdot.active{background:#2563eb}
 
-.q-counter {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1.5rem 1.5rem;
-    font-size: 0.7rem;
-    color: #64748b;
-}
-.q-dots {
-    display: flex;
-    gap: 0.5rem;
-}
-.q-dot {
-    width: 24px;
-    height: 3px;
-    background: #e2e8f0;
-    border-radius: 2px;
-}
-.q-dot.done {
-    background: #22c55e;
-}
-.q-dot.active {
-    background: #3b82f6;
-}
+/* CHAT */
+.chat-wrap{background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:1.5rem}
+.panel-label{font-size:0.68rem;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:1.2rem;display:flex;align-items:center;gap:0.5rem}
+.panel-label::before{content:'';width:3px;height:12px;background:#2563eb;border-radius:2px;display:inline-block}
+.chat-scroll{max-height:380px;overflow-y:auto;padding-right:0.3rem}
+.msg-row{display:flex;gap:0.7rem;margin-bottom:0.9rem;animation:fadein 0.3s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg-row.user{flex-direction:row-reverse}
+.msg-ava{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0;background:#f3f4f6;border:1px solid #e5e7eb}
+.msg-ava.you{background:#eff6ff;border-color:#bfdbfe}
+.mbubble{max-width:78%;padding:0.75rem 1rem;border-radius:12px;font-size:0.85rem;line-height:1.55}
+.mbubble.ai{background:#f8f7f4;color:#374151;border-top-left-radius:4px;border:1px solid #e5e7eb}
+.mbubble.you{background:#eff6ff;color:#1e40af;border-top-right-radius:4px;border:1px solid #bfdbfe}
 
-.chat-panel {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 24px;
-    padding: 1.5rem;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-.panel-title {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.panel-title::before {
-    content: '';
-    width: 3px;
-    height: 12px;
-    background: linear-gradient(135deg, #3b82f6, #4f46e5);
-    border-radius: 2px;
-}
+/* INPUT */
+.input-wrap{background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:1.5rem}
+.stTextArea textarea{background:#f8f7f4!important;border:1.5px solid #e5e7eb!important;border-radius:10px!important;color:#111827!important;font-size:0.9rem!important;font-family:'DM Sans',sans-serif!important;padding:0.9rem!important;resize:vertical!important}
+.stTextArea textarea::placeholder{color:#d1d5db!important}
+.stTextArea textarea:focus{border-color:#2563eb!important;box-shadow:0 0 0 3px #bfdbfe!important;outline:none!important;background:#ffffff!important}
+.stTextArea label{display:none!important}
 
-.chat-scroll {
-    flex: 1;
-    max-height: 400px;
-    overflow-y: auto;
-    margin-bottom: 1rem;
-}
-.msg-row {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    animation: slideIn 0.3s ease;
-}
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-.msg-row.user {
-    flex-direction: row-reverse;
-}
-.msg-ava {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
-    flex-shrink: 0;
-}
-.msg-ava.ai {
-    background: #f1f5f9;
-}
-.msg-ava.you {
-    background: #eef2ff;
-}
-.msg-bubble {
-    max-width: 80%;
-    padding: 0.75rem 1rem;
-    border-radius: 16px;
-    font-size: 0.85rem;
-    line-height: 1.5;
-}
-.msg-bubble.ai {
-    background: #f1f5f9;
-    color: #0f172a;
-    border-top-left-radius: 4px;
-}
-.msg-bubble.you {
-    background: #eef2ff;
-    color: #1e293b;
-    border-top-right-radius: 4px;
-}
-
-.stTextArea textarea {
-    background: white !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 16px !important;
-    color: #0f172a !important;
-    font-size: 0.85rem !important;
-    padding: 0.75rem !important;
-    resize: vertical !important;
-}
-.stTextArea textarea:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
-    outline: none !important;
-}
-
-.stButton > button {
-    width: 100%;
-    background: linear-gradient(135deg, #3b82f6, #4f46e5) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 40px !important;
-    padding: 0.7rem !important;
-    font-weight: 600 !important;
-    font-size: 0.85rem !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-}
-.stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
-}
-.stButton > button:active {
-    transform: translateY(0) !important;
-}
-
-.hero-section {
-    text-align: center;
-    padding: 3rem 2rem;
-}
-.hero-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 1rem;
-    background: #f1f5f9;
-    border-radius: 100px;
-    font-size: 0.7rem;
-    color: #475569;
-    margin-bottom: 1.5rem;
-}
-.hero-title {
-    font-size: 3rem;
-    font-weight: 800;
-    line-height: 1.2;
-    background: linear-gradient(135deg, #0f172a, #3b82f6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 1rem;
-}
-.hero-sub {
-    font-size: 1rem;
-    color: #475569;
-    max-width: 600px;
-    margin: 0 auto 2rem;
-}
-
-.feat-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    max-width: 800px;
-    margin: 0 auto 2rem;
-}
-.feat-card {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 1rem;
-    text-align: center;
-    transition: all 0.2s ease;
-}
-.feat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-.feat-icon {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-}
-.feat-name {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #3b82f6;
-    margin-bottom: 0.25rem;
-}
-.feat-desc {
-    font-size: 0.7rem;
-    color: #64748b;
-}
-
-.upload-zone {
-    background: white;
-    border: 2px dashed #cbd5e1;
-    border-radius: 20px;
-    padding: 2rem;
-    text-align: center;
-    margin-top: 1rem;
-}
+/* RESULTS */
+.r-banner{background:#ffffff;border:1px solid #e5e7eb;border-radius:20px;padding:3rem;text-align:center;margin-bottom:1.5rem}
+.verdict-chip{display:inline-flex;align-items:center;padding:0.4rem 1.2rem;border-radius:6px;font-size:0.78rem;font-weight:700;letter-spacing:0.05em;margin-bottom:1.5rem}
+.v-hire{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
+.v-maybe{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+.v-no{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5}
+.r-score{font-family:'Instrument Serif',serif;font-size:6rem;font-weight:400;color:#111827;line-height:1;letter-spacing:-0.03em}
+.r-score span{font-size:2rem;color:#9ca3af}
+.r-grade{display:inline-block;margin:0.7rem auto;background:#f3f4f6;color:#6b7280;padding:0.3rem 1rem;border-radius:6px;font-size:0.8rem;font-weight:600}
+.r-summary{font-size:0.95rem;color:#6b7280;max-width:540px;margin:0.8rem auto 0;line-height:1.65}
+.r-card{background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:1.6rem;margin-bottom:1.2rem}
+.r-card-title{font-size:0.72rem;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1.2rem}
+.bar-track{height:5px;background:#f3f4f6;border-radius:6px;overflow:hidden}
+.bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#2563eb,#059669)}
+.check-row{font-size:0.88rem;color:#374151;padding:0.55rem 0;border-bottom:1px solid #f3f4f6;display:flex;align-items:flex-start;gap:0.6rem}
 </style>
 """, unsafe_allow_html=True)
 
-def api(method: str, path: str, **kwargs):
+
+# ── API ────────────────────────────────────────────────────────────────────────
+def api(method, path, **kwargs):
     try:
         r = requests.request(method, f"{API_BASE}{path}", timeout=60, **kwargs)
         r.raise_for_status()
@@ -550,20 +222,16 @@ def api(method: str, path: str, **kwargs):
         st.error(f"Error: {e}")
         return None
 
+
+# ── State ──────────────────────────────────────────────────────────────────────
 def init_state():
     defaults = {
-        "page": "landing",
-        "session_token": None,
-        "resume_data": {},
-        "resume_score": {},
-        "current_round": "HR",
-        "current_question": "",
-        "question_number": 0,
-        "chat_history": [],
-        "rounds_completed": [],
-        "last_eval": None,
-        "final_report": None,
-        "is_speaking": False,
+        "page": "landing", "session_token": None,
+        "resume_data": {}, "resume_score": {},
+        "current_round": "HR", "current_question": "",
+        "question_number": 0, "chat_history": [],
+        "rounds_completed": [], "last_eval": None,
+        "final_report": None, "is_speaking": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -571,359 +239,360 @@ def init_state():
 
 init_state()
 
-def render_navbar(show_status: bool = False):
-    session_info = ""
+
+# ── Shared Components ──────────────────────────────────────────────────────────
+def render_navbar(show_status=False):
+    badge = ""
     if show_status and st.session_state.session_token:
-        rnd = st.session_state.current_round
-        meta = ROUND_META.get(rnd, {})
-        session_info = f'<div class="nav-badge">{meta.get("icon","🎯")} {meta.get("label","Interview")}</div>'
-    
-    st.markdown(f"""
-    <div class="navbar">
-        <div class="nav-logo">INTERVIEW<span style="background:none; -webkit-text-fill-color:#334155;">AI</span></div>
-        <div style="display:flex;align-items:center;gap:1rem;">
-            {session_info}
-            <div class="nav-right">
-                <span>Powered by Groq</span>
-                <span style="color:#cbd5e1;">|</span>
-                <span>llama-3.3-70b</span>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        m = ROUND_META.get(st.session_state.current_round, {})
+        badge = f'<span class="npill npill-blue">{m.get("icon","🎯")} {m.get("label","")}</span>'
+    st.markdown(
+        f'<div class="navbar"><div class="nav-logo"><span class="dot"></span>InterviewAI</div>'
+        f'<div class="nav-right">{badge}'
+        f'<span class="npill npill-dim">Powered by Groq</span>'
+        f'<span class="npill npill-dim">llama-3.3-70b</span>'
+        f'</div></div>',
+        unsafe_allow_html=True
+    )
 
-def render_progress(current_round: str, rounds_completed: list):
-    steps_html = ""
+
+def render_progress(current_round, rounds_completed):
+    steps = ""
     for i, r in enumerate(ROUNDS):
-        is_done = r in rounds_completed
-        is_active = r == current_round and r not in rounds_completed
-        circle_cls = "active" if is_active else ("done" if is_done else "")
-        label_cls = "active" if is_active else ("done" if is_done else "")
-        icon = "✓" if is_done else ROUND_META[r]["icon"]
-        
-        steps_html += f"""
-        <div class="prog-step">
-            <div class="prog-node">
-                <div class="prog-circle {circle_cls}">{icon}</div>
-                <div class="prog-label {label_cls}">{ROUND_META[r]['label']}</div>
-            </div>
-            {"" if i == len(ROUNDS)-1 else f'<div class="prog-line {"done" if i < len(ROUNDS)-1 and (ROUNDS[i+1] in rounds_completed or ROUNDS[i+1] == current_round or is_done) else ""}"></div>'}
-        </div>
-        """
-    st.markdown(f'<div class="progress-track">{steps_html}</div>', unsafe_allow_html=True)
+        done   = r in rounds_completed
+        active = r == current_round and not done
+        cc = "active" if active else ("done" if done else "")
+        lc = "active" if active else ("done" if done else "")
+        icon = "✓" if done else ROUND_META[r]["icon"]
+        ld = done or (i < len(ROUNDS)-1 and (ROUNDS[i+1] in rounds_completed or ROUNDS[i+1] == current_round))
+        conn = f'<div class="prog-line {"done" if ld else ""}"></div>' if i < len(ROUNDS)-1 else ""
+        steps += (f'<div class="prog-step"><div class="prog-node">'
+                  f'<div class="prog-circle {cc}">{icon}</div>'
+                  f'<div class="prog-label {lc}">{ROUND_META[r]["label"]}</div>'
+                  f'</div>{conn}</div>')
+    st.markdown(f'<div class="prog-wrap">{steps}</div>', unsafe_allow_html=True)
 
-def render_interviewer_panel(round_name: str, question: str, q_num: int, total_q: int = 5):
+
+def render_interviewer_panel(round_name, question, q_num, total_q=5):
     meta = ROUND_META.get(round_name, {})
-    interviewer = INTERVIEWER_DATA.get(round_name, {})
-    speaking_class = "speaking" if st.session_state.is_speaking else ""
-    
-    col1, col2 = st.columns([1, 1])
+    iv   = INTERVIEWER_DATA.get(round_name, {})
+    sp   = "speaking" if st.session_state.is_speaking else ""
+    dots = "".join(
+        f'<div class="qdot {"done" if i < q_num else "active" if i == q_num else ""}"></div>'
+        for i in range(total_q)
+    )
+    col1, col2 = st.columns(2, gap="medium")
     with col1:
-        st.markdown(f"""
-        <div class="interviewer-panel">
-            <div class="panel-header">
-                <div class="panel-rec">
-                    <div class="rec-dot"></div>
-                    <span>LIVE</span>
-                </div>
-                <div class="panel-id">{meta.get("label", "")}</div>
-            </div>
-            <div class="avatar-stage">
-                <div class="avatar-emoji-wrap {speaking_class}">
-                    {interviewer.get("emoji", "🤖")}
-                </div>
-                <div class="interviewer-name">{interviewer.get("name", "Interviewer")}</div>
-                <div class="interviewer-title">{interviewer.get("title", "")}</div>
-                <div class="interviewer-company">{interviewer.get("company", "")}</div>
-            </div>
-            <div class="hud-chips">
-                <div class="hud-chip">🎯 {meta.get("label", "")}</div>
-                <div class="hud-chip">📋 Q{q_num+1}/{total_q}</div>
-            </div>
-            <div class="round-tag">
-                <div class="round-tag-inner">
-                    <span>{meta.get("icon", "")}</span>
-                    <span>{meta.get("label", "")}</span>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.markdown(
+            f'<div class="iv-panel">'
+            f'<div class="iv-topbar"><div class="iv-live"><div class="recdot"></div>LIVE</div>'
+            f'<div class="iv-badge">{meta.get("label","")}</div></div>'
+            f'<div class="iv-body"><div class="iv-emo {sp}">{iv.get("emoji","🤖")}</div>'
+            f'<div class="iv-name">{iv.get("name","")}</div>'
+            f'<div class="iv-role">{iv.get("title","")}</div>'
+            f'<div class="iv-co">{iv.get("company","")}</div></div>'
+            f'<div class="iv-chips">'
+            f'<div class="ivchip">🎯 {meta.get("label","")}</div>'
+            f'<div class="ivchip">📋 Q{q_num+1}/{total_q}</div>'
+            f'</div></div>',
+            unsafe_allow_html=True
+        )
     with col2:
-        st.markdown(f"""
-        <div class="interviewer-panel">
-            <div class="panel-header">
-                <div class="panel-id">Current Question</div>
-            </div>
-            <div class="question-bubble">
-                {question}
-                <span class="typing-cursor"></span>
-            </div>
-            <div class="q-counter">
-                <span>Question {q_num+1} of {total_q}</span>
-                <div class="q-dots">
-        """, unsafe_allow_html=True)
-        
-        for i in range(total_q):
-            if i < q_num:
-                st.markdown('<div class="q-dot done"></div>', unsafe_allow_html=True)
-            elif i == q_num:
-                st.markdown('<div class="q-dot active"></div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="q-dot"></div>', unsafe_allow_html=True)
-        
-        st.markdown(f"""
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="q-panel">'
+            f'<div class="q-topbar"><div class="q-head">CURRENT QUESTION</div>'
+            f'<div class="q-cpill">Q{q_num+1} / {total_q}</div></div>'
+            f'<div class="q-bubble">{question}<span class="cursor"></span></div>'
+            f'<div class="qdots">{dots}</div></div>',
+            unsafe_allow_html=True
+        )
 
-def render_chat_panel(chat_history: list):
-    st.markdown(f"""
-    <div class="chat-panel">
-        <div class="panel-title">Conversation Log</div>
-        <div class="chat-scroll">
-    """, unsafe_allow_html=True)
-    
-    for msg in chat_history:
-        if msg["role"] == "assistant":
-            st.markdown(f"""
-            <div class="msg-row">
-                <div class="msg-ava ai">🤖</div>
-                <div class="msg-bubble ai">{msg["content"]}</div>
-            </div>
-            """, unsafe_allow_html=True)
+
+def render_chat(chat_history):
+    msgs = ""
+    for m in chat_history:
+        if m["role"] == "assistant":
+            msgs += (f'<div class="msg-row"><div class="msg-ava">🤖</div>'
+                     f'<div class="mbubble ai">{m["content"]}</div></div>')
         else:
-            st.markdown(f"""
-            <div class="msg-row user">
-                <div class="msg-ava you">👤</div>
-                <div class="msg-bubble you">{msg["content"]}</div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    st.markdown(f"""
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+            msgs += (f'<div class="msg-row user"><div class="msg-ava you">👤</div>'
+                     f'<div class="mbubble you">{m["content"]}</div></div>')
+    st.markdown(
+        f'<div class="chat-wrap"><div class="panel-label">Conversation Log</div>'
+        f'<div class="chat-scroll">{msgs}</div></div>',
+        unsafe_allow_html=True
+    )
 
+
+# ── Pages ──────────────────────────────────────────────────────────────────────
 def landing_page():
     render_navbar()
-    
-    st.markdown("""
-    <div class="hero-section">
-        <div class="hero-eyebrow">
-            <span>✨ AI-Powered Mock Interviews</span>
-        </div>
-        <div class="hero-title">
-            Ace Your Next Interview<br>
-            with Confidence
-        </div>
-        <div class="hero-sub">
-            Practice with AI interviewers, get real-time feedback, and track your progress across all interview rounds.
-        </div>
-        <div class="feat-grid">
-            <div class="feat-card">
-                <div class="feat-icon">👤</div>
-                <div class="feat-name">HR Round</div>
-                <div class="feat-desc">Behavioral & cultural fit</div>
-            </div>
-            <div class="feat-card">
-                <div class="feat-icon">🧮</div>
-                <div class="feat-name">Aptitude</div>
-                <div class="feat-desc">Quant & logical reasoning</div>
-            </div>
-            <div class="feat-card">
-                <div class="feat-icon">💻</div>
-                <div class="feat-name">Technical</div>
-                <div class="feat-desc">Domain expertise</div>
-            </div>
-            <div class="feat-card">
-                <div class="feat-icon">🔢</div>
-                <div class="feat-name">DSA</div>
-                <div class="feat-desc">Data structures & algorithms</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.container():
-        st.markdown('<div class="upload-zone">', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader("Upload your resume (PDF)", type=["pdf"], key="resume_upload")
-        
-        if uploaded_file:
-            files = {"file": ("resume.pdf", uploaded_file.getvalue(), "application/pdf")}
-            result = api("POST", "/analyze-resume", files=files)
-            
-            if result:
-                st.session_state.resume_data = result.get("resume_data", {})
-                st.session_state.resume_score = result.get("score", {})
-                st.session_state.page = "interview"
-                st.rerun()
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button("Start Practice Session →", use_container_width=True):
-                if not uploaded_file:
-                    st.warning("Please upload your resume first")
-                else:
-                    init_data = api("POST", "/init-session", json={"resume_data": st.session_state.resume_data})
-                    if init_data:
-                        st.session_state.session_token = init_data.get("session_token")
-                        st.session_state.current_round = init_data.get("current_round", "HR")
-                        st.session_state.current_question = init_data.get("question", "Tell me about yourself.")
-                        st.session_state.chat_history = [{"role": "assistant", "content": st.session_state.current_question}]
-                        st.session_state.page = "interview"
-                        st.rerun()
-        
+    st.markdown('<div class="page">', unsafe_allow_html=True)
+
+    # Hero
+    st.markdown(
+        '<div class="hero">'
+        '<div class="hero-label">✦ AI-Powered Mock Interviews</div>'
+        '<div class="hero-title">Master Every Round.<br>Land Your <em>Dream Job.</em></div>'
+        '<div class="hero-sub">Practice with AI interviewers across HR, Aptitude, Technical, and DSA rounds. '
+        'Get real-time scoring and detailed reports to close the gap between where you are and where you want to be.</div>'
+        '<div class="hero-stats">'
+        '<div><div class="hstat-num">4</div><div class="hstat-lbl">Interview Rounds</div></div>'
+        '<div><div class="hstat-num">20+</div><div class="hstat-lbl">Questions / Session</div></div>'
+        '<div><div class="hstat-num">AI</div><div class="hstat-lbl">Real-time Feedback</div></div>'
+        '<div><div class="hstat-num">3×</div><div class="hstat-lbl">Offer Likelihood</div></div>'
+        '</div>'
+        '<div class="hero-deco">🎯</div>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    # Round Cards
+    st.markdown('<div class="sec-title">What You\'ll Be Tested On</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Each round is tailored to your resume and real-world standards of top companies.</div>', unsafe_allow_html=True)
+    descs = {
+        "HR":        "Behavioural questions, leadership stories, culture fit assessments, and motivation deep-dives.",
+        "APTITUDE":  "Quantitative reasoning, logical puzzles, data interpretation, and verbal ability.",
+        "TECHNICAL": "Domain-specific knowledge, system design concepts, and project-based scenarios.",
+        "DSA":       "Arrays, trees, graphs, dynamic programming, and algorithm complexity analysis.",
+    }
+    cards = "".join(
+        f'<div class="round-card">'
+        f'<div class="rc-icon-wrap" style="background:{ROUND_META[r]["bg"]}">{ROUND_META[r]["icon"]}</div>'
+        f'<div class="rc-name">{ROUND_META[r]["label"]}</div>'
+        f'<div class="rc-desc">{descs[r]}</div>'
+        f'<span class="rc-tag" style="background:{ROUND_META[r]["bg"]};color:{ROUND_META[r]["color"]};border:1px solid {ROUND_META[r]["border"]}">{r}</span>'
+        f'</div>'
+        for r in ROUNDS
+    )
+    st.markdown(f'<div class="round-grid">{cards}</div>', unsafe_allow_html=True)
+
+    # Greeter
+    iv = INTERVIEWER_DATA["HR"]
+    st.markdown(
+        f'<div class="greeter"><div class="greeter-emo-wrap">{iv["emoji"]}</div>'
+        f'<div><div class="gname">{iv["name"]} — Your First Interviewer</div>'
+        f'<div class="gtitle">{iv["title"]} · {iv["company"]}</div>'
+        f'<div class="gmsg">"{INTERVIEWER_GREETINGS["HR"]}"</div></div></div>',
+        unsafe_allow_html=True
+    )
+
+    # Fun Fact
+    fact = random.choice(FUN_FACTS)
+    st.markdown(
+        f'<div class="funfact"><div class="ff-icon">💡</div>'
+        f'<div><div class="ff-label">Did You Know?</div>'
+        f'<div class="ff-text">{fact}</div></div></div>',
+        unsafe_allow_html=True
+    )
+
+    # Upload
+    st.markdown(
+        '<div class="upload-card">'
+        '<div class="uc-title">Upload Your Resume to Begin</div>'
+        '<div class="uc-sub">We\'ll personalise every question to your experience, skills, and the roles you\'re targeting.</div>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+    uploaded_file = st.file_uploader(
+        "Upload your resume (PDF)", type=["pdf"],
+        key="resume_upload", label_visibility="collapsed",
+    )
+    if uploaded_file:
+        files = {"file": ("resume.pdf", uploaded_file.getvalue(), "application/pdf")}
+        result = api("POST", "/analyze-resume", files=files)
+        if result:
+            st.session_state.resume_data  = result.get("resume_data", {})
+            st.session_state.resume_score = result.get("score", {})
+            st.session_state.page = "interview"
+            st.rerun()
+
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+    _, mid, _ = st.columns([1, 2, 1])
+    with mid:
+        st.markdown('<div class="btn-primary">', unsafe_allow_html=True)
+        if st.button("Start Practice Session →", use_container_width=True):
+            if not uploaded_file:
+                st.warning("Please upload your resume first.")
+            else:
+                init_data = api("POST", "/init-session", json={"resume_data": st.session_state.resume_data})
+                if init_data:
+                    st.session_state.session_token    = init_data.get("session_token")
+                    st.session_state.current_round    = init_data.get("current_round", "HR")
+                    st.session_state.current_question = init_data.get("question", "Tell me about yourself.")
+                    st.session_state.chat_history     = [{"role": "assistant", "content": st.session_state.current_question}]
+                    st.session_state.page = "interview"
+                    st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
 def interview_page():
     render_navbar(show_status=True)
     render_progress(st.session_state.current_round, st.session_state.rounds_completed)
-    
-    total_q = 5
+    st.markdown('<div class="iv-page">', unsafe_allow_html=True)
+
+    rnd = st.session_state.current_round
+    iv  = INTERVIEWER_DATA[rnd]
+    st.markdown(
+        f'<div class="greeter" style="margin-bottom:1.8rem">'
+        f'<div class="greeter-emo-wrap">{iv["emoji"]}</div>'
+        f'<div><div class="gname">{iv["name"]}</div>'
+        f'<div class="gtitle">{iv["title"]} · {iv["company"]}</div>'
+        f'<div class="gmsg">"{INTERVIEWER_GREETINGS[rnd]}"</div>'
+        f'</div></div>',
+        unsafe_allow_html=True
+    )
+
     render_interviewer_panel(
         st.session_state.current_round,
         st.session_state.current_question,
-        st.session_state.question_number,
-        total_q
+        st.session_state.question_number, 5,
     )
-    
-    col_chat, col_input = st.columns([2, 1])
-    
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    col_chat, col_input = st.columns([3, 2], gap="medium")
     with col_chat:
-        render_chat_panel(st.session_state.chat_history)
-    
+        render_chat(st.session_state.chat_history)
+
     with col_input:
-        st.markdown('<div class="chat-panel" style="padding: 1rem;">', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">Your Answer</div>', unsafe_allow_html=True)
-        
-        answer = st.text_area("Type your response here...", height=200, key="answer_input", label_visibility="collapsed")
-        
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            submit = st.button("Submit Answer", use_container_width=True)
-        with col_btn2:
-            if st.button("End Session", use_container_width=True):
-                report = api("POST", "/final-report", json={"session_token": st.session_state.session_token})
-                if report:
-                    st.session_state.final_report = report
-                    st.session_state.page = "results"
-                    st.rerun()
-        
+        st.markdown('<div class="input-wrap"><div class="panel-label">Your Answer</div>', unsafe_allow_html=True)
+        answer = st.text_area("ans", height=220, key="answer_input",
+                              label_visibility="collapsed",
+                              placeholder="Type your answer here…")
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            st.markdown('<div class="btn-primary">', unsafe_allow_html=True)
+            submit = st.button("✅ Submit", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        with col_b2:
+            st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
+            end = st.button("⏹ End Session", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if end:
+            report = api("POST", "/final-report", json={"session_token": st.session_state.session_token})
+            if report:
+                st.session_state.final_report = report
+                st.session_state.page = "results"
+                st.rerun()
+
         if submit and answer:
             st.session_state.chat_history.append({"role": "user", "content": answer})
             st.session_state.is_speaking = True
-            
-            eval_response = api("POST", "/evaluate", json={
+            ev = api("POST", "/evaluate", json={
                 "session_token": st.session_state.session_token,
                 "answer": answer,
-                "round_name": st.session_state.current_round
+                "round_name": st.session_state.current_round,
             })
-            
-            if eval_response:
-                st.session_state.last_eval = eval_response
-                score = eval_response.get("score", 0)
-                feedback = eval_response.get("feedback", "")
-                
+            if ev:
+                st.session_state.last_eval = ev
                 st.session_state.chat_history.append({
                     "role": "assistant",
-                    "content": f"📊 Score: {score}/10\n\n💡 Feedback: {feedback}"
+                    "content": f"📊 Score: {ev.get('score',0)}/10\n\n💡 {ev.get('feedback','')}",
                 })
-                
-                if eval_response.get("move_next", False):
-                    next_q = api("POST", "/next-question", json={"session_token": st.session_state.session_token})
-                    if next_q:
-                        if next_q.get("round_completed", False):
+                if ev.get("move_next", False):
+                    nq = api("POST", "/next-question", json={"session_token": st.session_state.session_token})
+                    if nq:
+                        if nq.get("round_completed", False):
                             st.session_state.rounds_completed.append(st.session_state.current_round)
-                            next_round_idx = ROUNDS.index(st.session_state.current_round) + 1
-                            if next_round_idx < len(ROUNDS):
-                                st.session_state.current_round = ROUNDS[next_round_idx]
-                                st.session_state.question_number = 0
-                                st.session_state.current_question = next_q.get("question", "")
+                            idx = ROUNDS.index(st.session_state.current_round) + 1
+                            if idx < len(ROUNDS):
+                                st.session_state.current_round    = ROUNDS[idx]
+                                st.session_state.question_number  = 0
+                                st.session_state.current_question = nq.get("question", "")
                                 st.session_state.chat_history.append({"role": "assistant", "content": st.session_state.current_question})
                             else:
-                                report = api("POST", "/final-report", json={"session_token": st.session_state.session_token})
-                                if report:
-                                    st.session_state.final_report = report
+                                rpt = api("POST", "/final-report", json={"session_token": st.session_state.session_token})
+                                if rpt:
+                                    st.session_state.final_report = rpt
                                     st.session_state.page = "results"
                         else:
-                            st.session_state.current_question = next_q.get("question", "")
+                            st.session_state.current_question = nq.get("question", "")
                             st.session_state.question_number += 1
                             st.session_state.chat_history.append({"role": "assistant", "content": st.session_state.current_question})
-            
             st.session_state.is_speaking = False
             st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
 def results_page():
     render_navbar()
-    
     report = st.session_state.final_report
     if not report:
-        st.error("No report available")
+        st.error("No report available.")
         if st.button("Start New Session"):
             st.session_state.page = "landing"
             st.rerun()
         return
-    
-    overall_score = report.get("overall_score", 0)
-    grade = report.get("grade", "C")
+
+    overall = report.get("overall_score", 0)
+    grade   = report.get("grade", "C")
     verdict = report.get("verdict", "Consider")
     summary = report.get("summary", "")
-    
-    verdict_class = "v-hire" if "hire" in verdict.lower() else ("v-maybe" if "consider" in verdict.lower() else "v-no")
-    verdict_text = "🎉 RECOMMENDED FOR HIRE" if "hire" in verdict.lower() else ("📝 CONSIDER FOR NEXT ROUND" if "consider" in verdict.lower() else "📋 NEEDS IMPROVEMENT")
-    
-    st.markdown(f"""
-    <div class="report-banner">
-        <div class="verdict-chip {verdict_class}">{verdict_text}</div>
-        <div class="final-score">{overall_score}<span style="font-size:1.5rem;">/100</span></div>
-        <div class="grade-tag">Grade {grade}</div>
-        <div class="exec-summary">{summary}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown('<div class="info-card"><div class="info-card-title">Round-wise Performance</div>', unsafe_allow_html=True)
-        round_scores = report.get("round_scores", {})
-        for round_name in ROUNDS:
-            score = round_scores.get(round_name, 0)
-            percentage = (score / 10) * 100 if score <= 10 else score
-            st.markdown(f"""
-            <div style="margin-bottom:1rem;">
-                <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.25rem;">
-                    <span>{ROUND_META[round_name]["icon"]} {ROUND_META[round_name]["label"]}</span>
-                    <span><strong>{score}/10</strong></span>
-                </div>
-                <div class="bar-track">
-                    <div class="bar-fill" style="width:{percentage}%;"></div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown('<div class="info-card"><div class="info-card-title">Key Strengths</div>', unsafe_allow_html=True)
-        for strength in report.get("strengths", ["Communication Skills", "Technical Knowledge", "Problem Solving"])[:3]:
-            st.markdown(f'<div class="check-row">✅ {strength}</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="info-card-title" style="margin-top:1rem;">Areas for Improvement</div>', unsafe_allow_html=True)
-        for improvement in report.get("improvements", ["Practice more", "Structure answers better", "Time management"])[:3]:
-            st.markdown(f'<div class="check-row">🎯 {improvement}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    if st.button("Start New Practice Session", use_container_width=True):
-        for key in ["session_token", "resume_data", "resume_score", "current_round", "current_question", 
-                    "question_number", "chat_history", "rounds_completed", "last_eval", "final_report"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.session_state.page = "landing"
-        st.rerun()
 
+    if "hire" in verdict.lower():
+        vc, vt = "v-hire",  "✓ Recommended for Hire"
+    elif "consider" in verdict.lower():
+        vc, vt = "v-maybe", "→ Consider for Next Round"
+    else:
+        vc, vt = "v-no",    "✗ Needs Improvement"
+
+    st.markdown('<div class="results-page">', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="r-banner">'
+        f'<div class="verdict-chip {vc}">{vt}</div>'
+        f'<div class="r-score">{overall}<span>/100</span></div>'
+        f'<div class="r-grade">Grade {grade}</div>'
+        f'<div class="r-summary">{summary}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+
+    col1, col2 = st.columns(2, gap="medium")
+    rs = report.get("round_scores", {})
+    with col1:
+        st.markdown('<div class="r-card"><div class="r-card-title">Round-wise Performance</div>', unsafe_allow_html=True)
+        for r in ROUNDS:
+            score = rs.get(r, 0)
+            pct   = (score / 10) * 100 if score <= 10 else score
+            st.markdown(
+                f'<div style="margin-bottom:1.2rem">'
+                f'<div style="display:flex;justify-content:space-between;font-size:0.85rem;color:#6b7280;margin-bottom:0.4rem">'
+                f'<span>{ROUND_META[r]["icon"]} {ROUND_META[r]["label"]}</span>'
+                f'<strong style="color:#111827">{score}/10</strong></div>'
+                f'<div class="bar-track"><div class="bar-fill" style="width:{pct}%"></div></div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        strengths = report.get("strengths", ["Communication Skills", "Technical Knowledge", "Problem Solving"])[:3]
+        improve   = report.get("improvements", ["Practice more", "Structure answers better", "Time management"])[:3]
+        s_html = "".join(f'<div class="check-row">✅ {s}</div>' for s in strengths)
+        i_html = "".join(f'<div class="check-row">🎯 {i}</div>' for i in improve)
+        st.markdown(
+            f'<div class="r-card"><div class="r-card-title">Key Strengths</div>{s_html}'
+            f'<div class="r-card-title" style="margin-top:1.4rem">Areas for Improvement</div>{i_html}</div>',
+            unsafe_allow_html=True
+        )
+
+    st.markdown("<div style='height:1.2rem'></div>", unsafe_allow_html=True)
+    _, mid, _ = st.columns([1, 2, 1])
+    with mid:
+        if st.button("🔄 Start New Session", use_container_width=True):
+            for k in ["session_token","resume_data","resume_score","current_round","current_question",
+                      "question_number","chat_history","rounds_completed","last_eval","final_report"]:
+                st.session_state.pop(k, None)
+            st.session_state.page = "landing"
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ── Router ─────────────────────────────────────────────────────────────────────
 if st.session_state.page == "landing":
     landing_page()
 elif st.session_state.page == "interview":
