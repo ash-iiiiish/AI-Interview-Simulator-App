@@ -1,25 +1,11 @@
-# Python
+.env
 __pycache__/
-*.py[cod]
 *.pyc
-.venv/
-env/
-venv/
+*.pyo
+.pytest_cache/
+*.egg-info/
 dist/
 build/
-*.egg-info/
-
-# Env
-.env
-!.env.example
-
-# IDE
-.vscode/
-.idea/
-*.swp
-
-# Streamlit
-.streamlit/secrets.toml
-
-# Docker
+.venv/
+venv/
 *.log

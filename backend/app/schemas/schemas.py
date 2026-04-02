@@ -1,12 +1,8 @@
-"""
-Pydantic v2 schemas — request bodies and response shapes for all API endpoints.
-"""
+"""schemas.py — Pydantic v2 request/response schemas."""
 
-from typing import Any, Optional
-from pydantic import BaseModel, field_validator
+from typing import Optional
+from pydantic import BaseModel
 
-
-# ── Interview ──────────────────────────────────────────────────────────────────
 
 class StartRoundRequest(BaseModel):
     session_token: str
@@ -18,19 +14,3 @@ class AnswerRequest(BaseModel):
     answer: str
     question: str
     round_name: str
-
-
-# ── Responses ──────────────────────────────────────────────────────────────────
-
-class EvaluationResult(BaseModel):
-    score: float
-    feedback: str
-    strengths: list[str]
-    improvements: list[str]
-    sample_answer_hint: Optional[str] = None
-
-
-class RoundDetail(BaseModel):
-    score: float
-    config: dict[str, Any]
-    questions: list[dict[str, Any]]

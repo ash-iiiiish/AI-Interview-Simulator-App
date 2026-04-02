@@ -1,47 +1,48 @@
 version: "3.9"
 
 services:
-  postgres:
+
+  # ── PostgreSQL Database ────────────────────────────────────────────────
+  db:
     image: postgres:16-alpine
+    container_name: interview_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ai_interview_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+      POSTGRES_DB: interview_db
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
+  # ── FastAPI Backend ────────────────────────────────────────────────────
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: interview_backend
     restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/interview_db
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_interview_db
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
-      - SECRET_KEY=${SECRET_KEY:-change-me}
-      - BACKEND_URL=http://localhost:8000
     depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./backend:/app
+      - db
 
+  # ── Streamlit Frontend ─────────────────────────────────────────────────
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: interview_frontend
     restart: unless-stopped
+    env_file: .env
+    environment:
+      BACKEND_URL: http://backend:8000
     ports:
       - "8501:8501"
-    environment:
-      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
 

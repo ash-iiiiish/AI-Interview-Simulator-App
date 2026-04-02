@@ -1,8 +1,8 @@
 """
-LLM Agents — ALL AI/LLM logic lives here.
+llm_agents.py — All AI/LLM logic using the free Groq API.
 
-Uses Groq SDK 0.13.x which is compatible with Python 3.12+.
-The Groq client is instantiated ONCE.
+Model used: llama-3.3-70b-versatile (free on Groq).
+Get your free API key at https://console.groq.com/keys
 """
 
 import json
@@ -12,90 +12,60 @@ from groq import Groq
 
 from app.core.config import settings
 
-# ── Single Groq client instance ───────────────────────────────────────────────
+# Single Groq client — reused for all calls
 groq_client = Groq(api_key=settings.GROQ_API_KEY)
 
 
-# ── System Prompts ────────────────────────────────────────────────────────────
+# ── System Prompts ─────────────────────────────────────────────────────────────
 
-def get_system_prompt(round_name: str, resume_data: dict) -> str:
-    """Build a round-specific system prompt personalised with candidate's resume."""
+def _build_system_prompt(round_name: str, resume_data: dict) -> str:
+    """Build a round-specific system prompt personalised with the candidate's resume."""
 
-    def _join(items: list, limit: int = 10) -> str:
+    def _join(items: list, limit: int = 8) -> str:
         return ", ".join(str(i) for i in items[:limit]) if items else "Not specified"
 
-    skills = resume_data.get("technical_skills") or resume_data.get("skills") or []
-    projects = resume_data.get("projects") or []
-    experience = resume_data.get("experience") or []
-    education = resume_data.get("education") or []
+    skills    = resume_data.get("technical_skills") or resume_data.get("skills") or []
+    projects  = resume_data.get("projects") or []
+    name      = resume_data.get("name", "Candidate")
 
-    project_names = _join([
+    proj_names = _join([
         p.get("name", "") if isinstance(p, dict) else str(p)
         for p in projects
     ], 3)
 
-    exp_summary = _join([
-        f"{e.get('role', '')} at {e.get('company', '')}" if isinstance(e, dict) else str(e)
-        for e in experience
-    ], 2)
-
-    edu_summary = _join([
-        e.get("degree", "") if isinstance(e, dict) else str(e)
-        for e in education
-    ], 2)
-
-    resume_summary = f"""
-Candidate Profile:
-- Name: {resume_data.get('name', 'Candidate')}
-- Skills: {_join(skills)}
-- Projects: {project_names}
-- Experience: {exp_summary}
-- Education: {edu_summary}
-"""
+    candidate_summary = f"""
+Candidate: {name}
+Skills: {_join(skills)}
+Projects: {proj_names}
+""".strip()
 
     prompts = {
-        "HR": f"""You are a professional HR interviewer conducting a behavioral interview.
-{resume_summary}
-Your role:
-- Ask ONE behavioral question at a time (STAR format friendly)
-- Focus on: teamwork, leadership, conflict resolution, motivation, goals
-- Be warm, professional, and encouraging
-- Keep questions concise and clear
-- After the candidate answers, briefly acknowledge then ask the next question
-- Do NOT evaluate in your response — just ask questions naturally""",
+        "HR": f"""You are a professional HR interviewer.
+{candidate_summary}
+- Ask ONE behavioral question at a time (STAR format friendly).
+- Focus on teamwork, leadership, communication, and motivation.
+- Be warm and professional.
+- Do NOT evaluate in your response — just ask the next question naturally.""",
 
-        "APTITUDE": f"""You are an aptitude test examiner conducting a quantitative reasoning assessment.
-{resume_summary}
-Your role:
-- Ask ONE aptitude question at a time
-- Cover: number series, percentages, ratios, profit/loss, time-speed-distance, logical puzzles
-- Make questions clear with specific numbers
-- After the candidate answers, say 'Got it.' or 'Noted.' then move to the next question
-- Do NOT reveal if the answer is right or wrong during the round""",
-
-        "TECHNICAL": f"""You are a senior technical interviewer conducting a domain knowledge interview.
-{resume_summary}
-Your role:
-- Ask ONE technical question at a time based on the candidate's skills and projects
-- Cover: concepts from their listed technologies, project architecture, problem-solving
-- Ask follow-up questions about specific projects when relevant
-- Be conversational but rigorous
-- After an answer, say 'Interesting.' or 'I see.' then proceed""",
+        "TECHNICAL": f"""You are a senior technical interviewer.
+{candidate_summary}
+- Ask ONE technical question at a time based on the candidate's skills/projects.
+- Cover concepts from their listed technologies.
+- Be concise and rigorous.
+- Do NOT reveal correct answers during the interview.""",
 
         "DSA": f"""You are a DSA interviewer at a top tech company.
-{resume_summary}
-Your role:
-- Ask ONE coding/algorithmic question at a time
-- Start with easier problems and increase difficulty
-- Cover: arrays, strings, trees, graphs, dynamic programming, sorting
-- Ask the candidate to explain their approach and time/space complexity
-- Format questions clearly with examples""",
+{candidate_summary}
+- Ask ONE coding/algorithmic question at a time.
+- Start easier, increase difficulty gradually.
+- Cover arrays, strings, trees, graphs, dynamic programming.
+- Ask about time/space complexity.""",
     }
 
     return prompts.get(round_name, prompts["HR"])
 
 
-# ── Question Generation ────────────────────────────────────────────────────────
+# ── Generate Next Question ─────────────────────────────────────────────────────
 
 def generate_question(
     round_name: str,
@@ -103,19 +73,18 @@ def generate_question(
     chat_history: list,
     question_number: int,
 ) -> str:
-    """Generate the next interview question using the Groq LLM."""
+    """Generate the next interview question using Groq LLM (free)."""
 
-    system_prompt = get_system_prompt(round_name, resume_data)
+    system_prompt = _build_system_prompt(round_name, resume_data)
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
     if not chat_history:
-        intro_map = {
-            "HR": f"Ask HR behavioral question #{question_number}. If it's the first, start with a brief friendly greeting and introduce the round.",
-            "APTITUDE": f"Ask aptitude question #{question_number}. If first, briefly introduce the aptitude section.",
-            "TECHNICAL": f"Ask technical question #{question_number} based on the candidate's resume. If first, briefly introduce the technical round.",
-            "DSA": f"Ask DSA question #{question_number}. If first, briefly introduce the DSA coding round.",
+        opener = {
+            "HR":        f"Start the HR round. Greet the candidate briefly, then ask behavioral question #{question_number}.",
+            "TECHNICAL": f"Start the Technical round. Briefly introduce it, then ask technical question #{question_number}.",
+            "DSA":       f"Start the DSA round. Briefly introduce it, then ask DSA question #{question_number}.",
         }
-        messages.append({"role": "user", "content": intro_map.get(round_name, f"Ask question {question_number}.")})
+        messages.append({"role": "user", "content": opener.get(round_name, f"Ask question {question_number}.")})
     else:
         for msg in chat_history[-8:]:
             messages.append({"role": msg["role"], "content": msg["content"]})
@@ -125,13 +94,13 @@ def generate_question(
         model=settings.GROQ_MODEL,
         messages=messages,
         temperature=0.7,
-        max_tokens=500,
+        max_tokens=400,
+        timeout=60
     )
-
     return response.choices[0].message.content.strip()
 
 
-# ── Answer Evaluation ──────────────────────────────────────────────────────────
+# ── Evaluate Answer ────────────────────────────────────────────────────────────
 
 def evaluate_answer(
     round_name: str,
@@ -144,46 +113,33 @@ def evaluate_answer(
     if not answer or len(answer.strip()) < 5:
         return {
             "score": 0,
-            "feedback": "No meaningful answer provided. Please attempt the question.",
+            "feedback": "No meaningful answer provided.",
             "strengths": [],
             "improvements": ["Provide a detailed answer", "Don't skip questions"],
-            "sample_answer_hint": "Aim for a complete, structured response.",
         }
 
     skills = resume_data.get("technical_skills") or resume_data.get("skills") or []
-    projects = resume_data.get("projects") or []
 
-    prompt = f"""You are evaluating an interview answer. Return ONLY valid JSON.
+    prompt = f"""Evaluate this interview answer. Return ONLY valid JSON — no markdown, no extra text.
 
 Round: {round_name}
 Question: {question}
-Candidate's Answer: {answer}
+Answer: {answer}
+Candidate Skills: {", ".join(str(s) for s in skills[:6])}
 
-Candidate's background:
-- Skills: {", ".join(str(s) for s in skills[:8])}
-- Projects: {", ".join(p.get("name", "") if isinstance(p, dict) else str(p) for p in projects[:3])}
-
-Evaluate and return this exact JSON (no markdown, no extra text):
+Return exactly this JSON:
 {{
   "score": <number 1-10>,
   "feedback": "<2-3 sentence constructive feedback>",
   "strengths": ["<strength1>", "<strength2>"],
-  "improvements": ["<improvement1>", "<improvement2>"],
-  "sample_answer_hint": "<brief hint on what a strong answer looks like>"
-}}
-
-Scoring guide:
-- 9-10: Exceptional, comprehensive, impressive
-- 7-8: Good, clear, mostly complete
-- 5-6: Average, basic understanding shown
-- 3-4: Weak, missing key points
-- 1-2: Very poor or incorrect"""
+  "improvements": ["<improvement1>", "<improvement2>"]
+}}"""
 
     response = groq_client.chat.completions.create(
         model=settings.GROQ_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
-        max_tokens=600,
+        max_tokens=400,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -195,58 +151,46 @@ Scoring guide:
     except json.JSONDecodeError:
         return {
             "score": 5,
-            "feedback": "Your answer was received. Keep practising to improve clarity.",
+            "feedback": "Your answer was received. Keep practising for clarity.",
             "strengths": ["Attempted the question"],
-            "improvements": ["Be more specific", "Provide concrete examples"],
-            "sample_answer_hint": "Focus on structure and clarity.",
+            "improvements": ["Be more specific", "Use concrete examples"],
         }
 
 
-# ── Final Report Generation ────────────────────────────────────────────────────
+# ── Final Report ───────────────────────────────────────────────────────────────
 
-def generate_final_feedback(
+def generate_final_report(
     resume_data: dict,
     round_scores: dict,
-    all_answers: list,
 ) -> dict:
-    """Produce a comprehensive end-of-interview performance report."""
+    """Generate a comprehensive end-of-interview performance report."""
 
     scores_text = "\n".join([f"- {r}: {s:.1f}/10" for r, s in round_scores.items()])
     overall = sum(round_scores.values()) / len(round_scores) if round_scores else 0
 
-    prompt = f"""Generate a comprehensive interview performance report. Return ONLY valid JSON.
+    prompt = f"""Generate a brief interview performance report. Return ONLY valid JSON.
 
 Candidate: {resume_data.get('name', 'Candidate')}
-Skills: {", ".join(str(s) for s in (resume_data.get('technical_skills') or resume_data.get('skills') or [])[:8])}
-
 Round Scores:
 {scores_text}
-Overall Average: {overall:.1f}/10
+Overall: {overall:.1f}/10
 
-Return this exact JSON (no markdown):
+Return exactly this JSON (no markdown):
 {{
   "overall_score": {overall:.1f},
-  "overall_percentage": {(overall / 10) * 100:.0f},
-  "grade": "<A+/A/B+/B/C/D>",
-  "verdict": "<Strongly Recommended/Recommended/Maybe/Not Recommended>",
-  "executive_summary": "<3-4 sentence overall performance summary>",
-  "top_strengths": ["<strength1>", "<strength2>", "<strength3>"],
-  "key_improvements": ["<improvement1>", "<improvement2>", "<improvement3>"],
-  "round_analysis": {{
-    "HR": "<1-2 sentence analysis>",
-    "APTITUDE": "<1-2 sentence analysis>",
-    "TECHNICAL": "<1-2 sentence analysis>",
-    "DSA": "<1-2 sentence analysis>"
-  }},
-  "next_steps": ["<actionable step1>", "<actionable step2>", "<actionable step3>"],
-  "resources": ["<learning resource1>", "<learning resource2>"]
+  "grade": "<A/B/C/D>",
+  "verdict": "<Recommended/Maybe/Not Recommended>",
+  "summary": "<2-3 sentence summary>",
+  "top_strengths": ["<s1>", "<s2>", "<s3>"],
+  "improvements": ["<i1>", "<i2>", "<i3>"],
+  "next_steps": ["<step1>", "<step2>"]
 }}"""
 
     response = groq_client.chat.completions.create(
         model=settings.GROQ_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
-        max_tokens=1000,
+        max_tokens=600,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -258,13 +202,10 @@ Return this exact JSON (no markdown):
     except Exception:
         return {
             "overall_score": overall,
-            "overall_percentage": (overall / 10) * 100,
             "grade": "B",
             "verdict": "Recommended",
-            "executive_summary": f"Candidate scored {overall:.1f}/10 overall across all interview rounds.",
-            "top_strengths": ["Completed all rounds", "Showed willingness to learn"],
-            "key_improvements": ["Practice more DSA", "Improve communication"],
-            "round_analysis": {r: f"Scored {s:.1f}/10" for r, s in round_scores.items()},
-            "next_steps": ["Practice daily coding", "Review fundamentals"],
-            "resources": ["LeetCode", "GeeksForGeeks"],
+            "summary": f"Candidate scored {overall:.1f}/10 overall.",
+            "top_strengths": ["Completed all rounds"],
+            "improvements": ["Practice more"],
+            "next_steps": ["Review fundamentals", "Practice on LeetCode"],
         }
