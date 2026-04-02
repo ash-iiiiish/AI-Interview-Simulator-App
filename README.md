@@ -154,3 +154,10 @@ Tables are auto-created on first backend startup.
 | GET | `/api/evaluation/results/{token}` | Get full results + report |
 
 Swagger UI: **http://localhost:8000/docs**
+
+
+
+## 👨‍💻 Contributors
+- [@ash-iiiiish](https://github.com/ash-iiiiish)
+
+---
