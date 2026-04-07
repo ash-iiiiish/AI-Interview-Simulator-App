@@ -1,4 +1,5 @@
 .env
+aiinterviewsimulatorenv
 __pycache__/
 *.pyc
 *.pyo
